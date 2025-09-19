@@ -43,6 +43,10 @@ include-package-data = true
 
 [tool.setuptools.packages.find]
 where = ["src"]
+include = ["sqlalchemy_pydantic_codegen", "sqlalchemy_pydantic_codegen.*"]
+
+[tool.setuptools.package-data]
+sqlalchemy_pydantic_codegen = ["templates/*.jinja2"]
 
 [tool.basedpyright]
 include = ["src"]

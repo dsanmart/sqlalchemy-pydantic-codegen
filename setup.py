@@ -16,7 +16,6 @@ setup(
         "Operating System :: OS Independent",
     ],
     python_requires=">=3.6",
-    install_requires=open("requirements.txt").read().splitlines(),
     include_package_data=True,
     entry_points={
         "console_scripts": [

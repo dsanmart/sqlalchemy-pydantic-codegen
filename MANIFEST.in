@@ -1,0 +1,2 @@
+graft src/sqlalchemy_pydantic_codegen/templates
+include src/sqlalchemy_pydantic_codegen/templates/*.jinja2
