@@ -3,6 +3,11 @@ name: Publish Package
 on:
   release:
     types: [created]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to publish'
+        required: true
 
 jobs:
   publish:
@@ -21,6 +26,11 @@ jobs:
         run: |
           pip install uv wheel
           uv sync
+
+      - name: Set version from workflow input
+        if: ${{ github.event_name == 'workflow_dispatch' }}
+        run: |
+          sed -i '' "s/^version = .*/version = \"${{ github.event.inputs.version }}\"/" pyproject.toml
 
       - name: Build package
         run: |
