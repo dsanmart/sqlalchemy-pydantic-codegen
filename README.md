@@ -1,55 +1,38 @@
-# SQLAlchemy-Pydantic Codegen
+# 🐍🔗 SQLAlchemy-Pydantic Codegen
+
+[![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![PyPI](https://img.shields.io/pypi/v/sqlalchemy-pydantic-codegen)](https://pypi.org/project/sqlalchemy-pydantic-codegen/)
+[![Python Unit Tests](https://github.com/dsanmart/sqlalchemy-pydantic-codegen/actions/workflows/ci.yml/badge.svg)](https://github.com/dsanmart/sqlalchemy-pydantic-codegen/actions/workflows/ci.yml)
 
 A Python library for generating Pydantic models from SQLAlchemy models, providing a seamless integration between SQLAlchemy and Pydantic for data validation and serialization.
 
-## Features
+## ✨ Key Features
 
 - **Automatic Pydantic model generation** from SQLAlchemy models.
 - **Relationship support:** Nested models for SQLAlchemy relationships.
-- **Enum reflection:** SQLAlchemy enums become Pydantic enums.
-- **Field metadata:** Comments become descriptions, string lengths become `max_length`.
-- **Jinja2 templating** for customizable output.
-- **CLI** for easy usage, including output directory and config options.
 - **Custom JSON/JSONB field mapping** to your own Pydantic models.
-- **Post-generation cleaning** to remove or replace fields as needed.
 - **Auto-generated `__init__.py`** for schema packages.
-- **Ready for formatting tools** (e.g., Black, Ruff).
 
-## Installation
+## 📦 Installation
 
 ```bash
 uv add sqlalchemy-pydantic-codegen
 ```
 
-or
+## 🚀 Usage
 
-```bash
-pip install sqlalchemy-pydantic-codegen
-```
+> We recommend [sqlacodegen](https://github.com/agronholm/sqlacodegen) to generate your SQLAlchemy models automatically.
 
-## Preparing Your SQLAlchemy Models
-
-Before using `sqlalchemy-pydantic-codegen`, you may want to generate your SQLAlchemy models from an existing database using [sqlacodegen](https://github.com/agronholm/sqlacodegen). This tool introspects your database and creates SQLAlchemy model classes automatically. To generate models, run:
-
-```bash
-sqlacodegen postgresql://user:password@localhost/dbname --outfile src/db/models.py
-```
-
-Once your models are generated, you can proceed to use `sqlalchemy-pydantic-codegen` as described below.
-
-## Usage
-
-After installation, use the CLI to generate Pydantic models from your SQLAlchemy models.
-
-### Basic Usage
+Once your SQLAlchemy models are ready, generate Pydantic models with:
 
 ```bash
 sqlalchemy-pydantic-codegen --models-path my_app.db.models --output-dir src/schemas
 ```
-`--models-path`: Dotted path to your SQLAlchemy models module (required).
-`--output-dir`: Directory for generated Pydantic schemas (default: src/schemas).
 
-### Custom Configuration
+- `--models-path`: Dotted path to your SQLAlchemy models (required)  
+- `--output-dir`: Output directory for generated schemas (default: `src/schemas`)
+
+### 🛠️ Custom Configuration
 To map JSON/JSONB fields to custom Pydantic models, use the --config option.
 
 Create a config file (e.g., `codegen_config.py`):
@@ -76,14 +59,7 @@ Then, run the command with the `--config` flag:
 sqlalchemy-pydantic-codegen --models-path my_app.db.models --output-dir src/schemas --config codegen_config.py
 ```
 
-### Output
+### 📤 Output
 - One Pydantic schema file per SQLAlchemy model.
 - __init__.py with all exports and forward references.
 - Cleaned and ready-to-use Pydantic models.
-
-
-### Advanced
-- Supports nested relationships and cyclic reference handling.
-- Enum columns become Pydantic enums.
-- Field comments and constraints are preserved as Pydantic metadata.
-- Easily extend templates for your own conventions.
