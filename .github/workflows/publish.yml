@@ -34,6 +34,7 @@ jobs:
 
       - name: Build package
         run: |
+          source .venv/bin/activate
           python -m build
 
       - name: Publish to PyPI
@@ -41,5 +42,6 @@ jobs:
           TWINE_USERNAME: __token__
           TWINE_PASSWORD: ${{ secrets.PYPI_TOKEN }}
         run: |
+          source .venv/bin/activate
           uv add twine
           twine upload dist/*
