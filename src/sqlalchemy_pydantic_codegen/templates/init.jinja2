@@ -1,0 +1,22 @@
+"""Auto-generated Pydantic schemas"""
+__all__ = [
+{% for item in items %}
+    "{{ item.name }}",
+    "{{ item.name[:-6] }}Row",
+    "{{ item.name[:-6] }}Insert",
+    "{{ item.name[:-6] }}Update",
+{% endfor %}
+]
+
+{% for item in items %}
+from .{{ item.snake }} import \
+    {{ item.name[:-6] }}Insert, \
+    {{ item.name[:-6] }}Row, \
+    {{ item.name }}, \
+    {{ item.name[:-6] }}Update
+{% endfor %}
+
+# Rebuild forward refs on all BaseModel subclasses
+{% for item in items %}
+{{ item.name[:-6] }}Row.model_rebuild()
+{% endfor %}

@@ -1,0 +1,115 @@
+{%- set name = schema_name[:-6] -%}
+{#–– Collect typing imports in a local list ––#}
+{%- set typing_requires = [] -%}
+{%- if imports        %}{%- set typing_requires = typing_requires + ['TYPE_CHECKING'] -%}{%- endif -%}
+{%- if needs_any      %}{%- set typing_requires = typing_requires + ['Any'] -%}{%- endif -%}
+{%- if rels %}{%- set typing_requires = typing_requires + ['Callable'] %}{%- endif -%}
+from __future__ import annotations
+
+{% if needs_datetime %}
+import datetime
+{% endif %}
+{% if typing_requires %}
+from typing import {{ typing_requires | join(', ') }}
+{% endif %}
+{% if needs_uuid %}
+from uuid import UUID
+{% endif %}
+
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    {% if rels %}
+    model_validator,
+    field_validator,
+    ValidationError,
+    {% endif %}
+)
+
+{% if rels %}
+from sqlalchemy.exc import MissingGreenlet
+
+
+def _is_recursion_validation_error(exc: ValidationError) -> bool:
+    errs = exc.errors()
+    return len(errs) == 1 and errs[0]["type"] == "recursion_loop"
+{% endif %}
+
+
+{% if imports %}
+if TYPE_CHECKING:
+{% for imp in imports %}
+    from . import {{ imp.classname }}
+{% endfor %}
+{% endif %}
+
+
+class {{ name }}Schema(BaseModel):
+{% for f in base_fields %}
+    {{ f.name }}: {{ f.type_hint }} = Field(default={{ f.default }}{% if f.field_args %}, {{ f.field_args }}{% endif %})
+{% endfor %}
+
+
+class {{ name }}Row({{ name }}Schema):
+    id: {{ id_type }} = Field(default=...)  # pyright: ignore[reportIncompatibleVariableOverride]
+
+    # nested relationship objects
+{% for rel in rels %}
+    {{ rel.name }}: {% if rel.uselist %}list[{{ rel.classname }}] = []{% else %}{{ rel.classname }} | None = None{% endif %}
+
+{% endfor %}
+
+    {% if rels %}
+    @model_validator(mode="before")
+    @classmethod
+    def _extract_attrs(cls, obj: Any) -> dict[str, Any]:
+        data: dict[str, Any] = {}
+        for name, _ in cls.model_fields.items():
+            try:
+                data[name] = getattr(obj, name)
+            except MissingGreenlet:
+                # relationship wasn’t loaded — leave at the schema’s default
+                continue
+            except Exception:
+                # any other getattr‑error: skip too
+                continue
+        return data
+    {% endif %}
+
+    {% if rels %}
+    {# For every relationship, prune cyclic refs #}
+    {% for rel in rels %}
+    @field_validator("{{ rel.name }}", mode="wrap")
+    @classmethod
+    def _drop_cyclic_{{ rel.name }}(
+        cls, value: Any, handler: Callable[[Any], Any]
+    ) -> Any | None:
+        try:
+            return handler(value)
+        except ValidationError as exc:
+            if not _is_recursion_validation_error(exc):
+                raise
+            {% if rel.uselist %}
+            pruned: list[Any] = []
+            for item in value or []:  # pyright: ignore[reportUnknownVariableType]
+                try:
+                    pruned.extend(handler([item]))
+                except ValidationError:
+                    continue
+            return pruned
+            {% else %}
+            return None
+            {% endif %}
+
+    {% endfor %}
+    {% endif %}
+    model_config = ConfigDict(from_attributes=True)
+
+
+class {{ name }}Insert({{ name }}Schema):
+    pass
+
+
+class {{ name }}Update({{name}}Schema):
+    pass

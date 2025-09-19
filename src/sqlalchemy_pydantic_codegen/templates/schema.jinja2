@@ -1,0 +1,25 @@
+{%- set name = schema_name[:-6] -%}
+from __future__ import annotations
+
+from pydantic import BaseModel, ConfigDict, Field
+
+class {{ name }}Schema(BaseModel):
+{% for f in base_fields %}
+    {{ f.name }}: {{ f.type_hint }} = Field(default={{ f.default }}{% if f.field_args %}, {{ f.field_args }}{% endif %})
+{% endfor %}
+
+class {{ name }}Row({{ name }}Schema):
+    id: {{ id_type }} = Field(default=...)  # pyright: ignore[reportIncompatibleVariableOverride]
+
+    # nested relationship objects
+{% for rel in rels %}
+    {{ rel.name }}: {% if rel.uselist %}list[{{ rel.classname }}] = []{% else %}{{ rel.classname }} | None = None{% endif %}
+{% endfor %}
+
+    model_config = ConfigDict(from_attributes=True)
+
+class {{ name }}Insert({{ name }}Schema):
+    pass
+
+class {{ name }}Update({{ name }}Schema):
+    pass

@@ -1,0 +1,63 @@
+[build-system]
+requires = ["setuptools>=69", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "sqlalchemy-pydantic-codegen"
+version = "0.1.0"
+description = "A library to generate Pydantic models from SQLAlchemy models."
+license = { text = "MIT" }
+readme = "README.md"
+keywords = ["sqlalchemy", "pydantic", "codegen", "models"]
+requires-python = ">=3.8"
+
+dependencies = [
+    "sqlalchemy>=1.4",
+    "pydantic>=1.8",
+    "jinja2>=3.0",
+    "python-dotenv>=1.0.1",
+    "ruff>=0.13.1",
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=6.2",
+  "black>=21.7b0",
+  "mypy>=0.910",
+  "flake8>=3.9",
+  "ruff>=0.13.1",
+  "build",
+  "twine",
+]
+
+[project.urls]
+Homepage = "https://github.com/dsanmart/sqlalchemy-pydantic-codegen"
+Repository = "https://github.com/dsanmart/sqlalchemy-pydantic-codegen"
+Issues = "https://github.com/dsanmart/sqlalchemy-pydantic-codegen/issues"
+
+[project.scripts]
+sqlalchemy-pydantic-codegen = "sqlalchemy_pydantic_codegen.cli:main"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+include-package-data = true
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.basedpyright]
+include = ["src"]
+exclude = ["**/__pycache__", ".venv"]
+venvPath = "."
+venv = ".venv"
+reportAny = false
+reportExplicitAny = false
+reportCallInDefaultInitializer = false
+reportUnannotatedClassAttribute = false
+reportUnusedCallResult = false
+
+[dependency-groups]
+dev = [
+    "setuptools>=75.3.2",
+]
+
