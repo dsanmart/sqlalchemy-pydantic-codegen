@@ -3,7 +3,17 @@
 import uuid
 from typing import Any
 
-from sqlalchemy import Boolean, Date, DateTime, Enum, Float, Integer, Numeric, String
+from sqlalchemy import (
+    ARRAY,
+    Boolean,
+    Date,
+    DateTime,
+    Enum,
+    Float,
+    Integer,
+    Numeric,
+    String,
+)
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.sql.elements import NamedColumn
@@ -28,6 +38,8 @@ def map_sqlalchemy_type_to_pydantic(
     elif isinstance(sqlalchemy_type, Date):
         return "datetime.date", {}
     elif isinstance(sqlalchemy_type, JSONB):
+        return "list[dict[str, Any]] | dict[str, Any]", {}
+    elif isinstance(sqlalchemy_type, ARRAY[JSONB]):  # pyright: ignore[reportArgumentType]
         return "list[dict[str, Any]] | dict[str, Any]", {}
     elif (
         isinstance(sqlalchemy_type, PG_UUID)
