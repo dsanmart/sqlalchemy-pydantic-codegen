@@ -1,7 +1,7 @@
 # File: /sqlalchemy-pydantic-codegen/sqlalchemy-pydantic-codegen/src/sqlalchemy_pydantic_codegen/utils/type_mapping.py
 
 import uuid
-from typing import Any
+from typing import Any, cast
 
 from sqlalchemy import (
     ARRAY,
@@ -39,8 +39,11 @@ def map_sqlalchemy_type_to_pydantic(
         return "datetime.date", {}
     elif isinstance(sqlalchemy_type, JSONB):
         return "list[dict[str, Any]] | dict[str, Any]", {}
-    elif isinstance(sqlalchemy_type, ARRAY[JSONB]):  # pyright: ignore[reportArgumentType]
-        return "list[dict[str, Any]] | dict[str, Any]", {}
+    elif isinstance(sqlalchemy_type, ARRAY):
+        item: TypeEngine[Any] = cast(TypeEngine[Any], sqlalchemy_type.item_type)
+        if isinstance(item, JSONB):
+            return "list[dict[str, Any]] | dict[str, Any]", {}
+        return "list[Any]", {}
     elif (
         isinstance(sqlalchemy_type, PG_UUID)
         or getattr(sqlalchemy_type, "python_type", None) is uuid.UUID

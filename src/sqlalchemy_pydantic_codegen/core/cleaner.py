@@ -2,6 +2,8 @@ import re
 from pathlib import Path
 from typing import Any
 
+from ..utils.extract_model import extract_model_name
+
 
 def clean_models(raw_path: Path, out_path: Path):
     content = raw_path.read_text()
@@ -54,10 +56,11 @@ def clean_schema_file(
         if n > 0:
             text = new_text
             changed = True
+            lookup_name = extract_model_name(model)
 
             # Add the corresponding import if it's not already in the file
-            if model in custom_imports:
-                import_line = custom_imports[model]
+            if lookup_name in custom_imports:
+                import_line = custom_imports[lookup_name]
                 if import_line not in text:
                     # Find the last import statement to insert after
                     import_matches = list(
