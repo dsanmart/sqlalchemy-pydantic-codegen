@@ -64,6 +64,8 @@ class {{ name }}Row({{ name }}Schema):
     @model_validator(mode="before")
     @classmethod
     def _extract_attrs(cls, obj: Any) -> dict[str, Any]:
+        if isinstance(obj, dict):
+            return obj  # pyright: ignore[reportUnknownVariableType]
         data: dict[str, Any] = {}
         for name, _ in cls.model_fields.items():
             try:

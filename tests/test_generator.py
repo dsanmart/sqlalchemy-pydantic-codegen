@@ -68,5 +68,23 @@ def test_generate_models(generator: ModelGenerator, sample_models_module):
     assert "title: str | None = Field(default=None)" in post_content
     assert "content: str | None = Field(default=None)" in post_content
 
+    # Verify relationship fields are generated
+    assert "author: UserRow | None = None" in post_content
+    assert "posts: list[PostRow] = []" in user_content
+
+    # Verify validators are generated for models with relationships
+    assert "_extract_attrs" in user_content
+    assert "_extract_attrs" in post_content
+    assert "model_validator" in user_content
+    assert "model_validator" in post_content
+
+    # Verify cyclic reference validators are generated
+    assert "_drop_cyclic_posts" in user_content
+    assert "_drop_cyclic_author" in post_content
+
+    # Verify dict early-return in _extract_attrs
+    assert "if isinstance(obj, dict):" in user_content
+    assert "if isinstance(obj, dict):" in post_content
+
     # Clean up the created directory
     rmtree(output_dir)

@@ -1,5 +1,5 @@
-from sqlalchemy import UUID, Column, DateTime, Integer, String
-from sqlalchemy.orm import declarative_base
+from sqlalchemy import UUID, Column, DateTime, ForeignKey, Integer, String
+from sqlalchemy.orm import declarative_base, relationship
 
 Base = declarative_base()
 
@@ -12,6 +12,8 @@ class User(Base):
     email = Column(String, unique=True, index=True)
     created_at = Column(DateTime)
 
+    posts = relationship("Post", back_populates="author")
+
 
 class Post(Base):
     __tablename__ = "posts"
@@ -19,5 +21,7 @@ class Post(Base):
     id = Column(Integer, primary_key=True, index=True)
     title = Column(String, index=True)
     content = Column(String)
-    user_id = Column(Integer)  # Foreign key to User
+    user_id = Column(Integer, ForeignKey("users.id"))
     created_at = Column(DateTime)
+
+    author = relationship("User", back_populates="posts")
