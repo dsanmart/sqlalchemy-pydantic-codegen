@@ -5,6 +5,7 @@ from pathlib import Path
 from shutil import rmtree
 
 import pytest
+from sqlalchemy.sql.sqltypes import NullType
 
 # Add fixtures to path to allow import
 sys.path.append(str(Path(__file__).parent / "fixtures"))
@@ -90,14 +91,15 @@ def test_generate_models(generator: ModelGenerator, sample_models_module):
     rmtree(output_dir)
 
 
-def test_load_models_raises_clear_error_for_nulltype(tmp_path: Path):
-    """When a model has `Mapped[Any] = mapped_column(NullType)` (e.g. from a
-    pgvector column sqlacodegen didn't recognize), the raw SQLAlchemy error is
-    cryptic. load_models should catch it and point users at the cleaner."""
-    module_dir = tmp_path / "broken_pkg"
+def test_load_models_accepts_mapped_any_nulltype(tmp_path: Path):
+    """sqlacodegen emits `Mapped[Any] = mapped_column(NullType)` for unknown
+    DB types (pgvector's vector, tsvector, geometry, custom domains).
+    load_models registers Any -> NULLTYPE in sqltypes._type_map so SQLAlchemy
+    accepts the annotation instead of raising MappedAnnotationError."""
+    module_dir = tmp_path / "nulltype_pkg"
     module_dir.mkdir()
     (module_dir / "__init__.py").write_text("")
-    (module_dir / "broken_models.py").write_text(
+    (module_dir / "nulltype_models.py").write_text(
         "from typing import Any\n"
         "from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column\n"
         "from sqlalchemy.sql.sqltypes import NullType\n"
@@ -105,19 +107,20 @@ def test_load_models_raises_clear_error_for_nulltype(tmp_path: Path):
         "class Base(DeclarativeBase):\n"
         "    pass\n"
         "\n"
-        "class Broken(Base):\n"
-        "    __tablename__ = 'broken'\n"
+        "class Embed(Base):\n"
+        "    __tablename__ = 'embed'\n"
         "    id: Mapped[int] = mapped_column(primary_key=True)\n"
         "    embedding: Mapped[Any] = mapped_column(NullType)\n"
     )
 
     sys.path.insert(0, str(tmp_path))
     try:
-        with pytest.raises(RuntimeError, match="NullType|clean_models|pgvector"):
-            load_models("broken_pkg.broken_models")
+        mappers = load_models("nulltype_pkg.nulltype_models")
+        embed = next(m for m in mappers if m.class_.__name__ == "Embed")
+        embedding_col = embed.columns["embedding"]
+        assert isinstance(embedding_col.type, NullType)
     finally:
         sys.path.remove(str(tmp_path))
-        # Drop any partial import so other tests aren't poisoned.
         for name in list(sys.modules):
-            if name.startswith("broken_pkg"):
+            if name.startswith("nulltype_pkg"):
                 del sys.modules[name]

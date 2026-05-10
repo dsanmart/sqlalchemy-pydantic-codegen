@@ -20,6 +20,20 @@ from sqlalchemy.sql.elements import NamedColumn
 from sqlalchemy.types import TypeEngine
 
 
+def _safe_python_type(sqlalchemy_type: TypeEngine[Any]) -> Any:
+    """Return ``sqlalchemy_type.python_type`` or ``None`` if unsupported.
+
+    Some SQLAlchemy types (notably ``NullType``, produced for unrecognized
+    column types like pgvector's ``vector``) raise ``NotImplementedError``
+    from the ``python_type`` property. ``getattr(..., default)`` does not
+    swallow that exception, so we guard explicitly.
+    """
+    try:
+        return sqlalchemy_type.python_type
+    except (NotImplementedError, AttributeError):
+        return None
+
+
 def map_sqlalchemy_type_to_pydantic(
     sqlalchemy_type: TypeEngine[Any],
 ) -> tuple[str, dict[str, Any]]:
@@ -46,7 +60,7 @@ def map_sqlalchemy_type_to_pydantic(
         return "list[Any]", {}
     elif (
         isinstance(sqlalchemy_type, PG_UUID)
-        or getattr(sqlalchemy_type, "python_type", None) is uuid.UUID
+        or _safe_python_type(sqlalchemy_type) is uuid.UUID
     ):
         return "UUID", {}
     elif isinstance(sqlalchemy_type, Enum) and hasattr(sqlalchemy_type, "enums"):
@@ -57,10 +71,13 @@ def map_sqlalchemy_type_to_pydantic(
             {},
         )
     else:
-        try:
-            return sqlalchemy_type.python_type.__name__, {}
-        except Exception:
-            return "Any", {}
+        py = _safe_python_type(sqlalchemy_type)
+        if py is not None:
+            try:
+                return py.__name__, {}
+            except Exception:
+                pass
+        return "Any", {}
 
 
 def is_nullable(sqlalchemy_type: NamedColumn[Any]) -> bool:
