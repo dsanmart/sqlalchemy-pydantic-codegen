@@ -1,8 +1,19 @@
+import logging
 import re
 from pathlib import Path
 from typing import Any
 
 from ..utils.extract_model import extract_model_name
+
+# sqlacodegen emits this for any column whose DB type it doesn't recognize
+# (pgvector's `vector`, `tsvector`, `geometry`, custom domains, etc.).
+# SQLAlchemy itself then rejects the resulting `Mapped[Any]` annotation at
+# import time with MappedAnnotationError, before this library ever sees the
+# model. We rewrite the column to an importable form so codegen can proceed.
+_NULLTYPE_COLUMN_RE = re.compile(
+    r"^(?P<indent>\s+)(?P<name>\w+):\s*Mapped\[Any\]\s*=\s*mapped_column\(NullType\)",
+    flags=re.MULTILINE,
+)
 
 
 def clean_models(raw_path: Path, out_path: Path):
@@ -23,6 +34,24 @@ def clean_models(raw_path: Path, out_path: Path):
         content,
         flags=re.MULTILINE,
     )
+
+    # Rewrite NullType columns so SQLAlchemy can import the module.
+    # Defaults to ARRAY(REAL): pgvector is by far the most common source of
+    # NullType in practice and serializes to a list of floats anyway.
+    def _replace_nulltype(match: re.Match[str]) -> str:
+        column_name = match.group("name")
+        logging.warning(
+            "Column '%s' has an unrecognized DB type (NullType); "
+            "rewriting to ARRAY(REAL). Fidelity is lost — use an explicit "
+            "SQLAlchemy type in your model for high-fidelity schemas.",
+            column_name,
+        )
+        return (
+            f"{match.group('indent')}{column_name}: Mapped[Optional[list]] "
+            f"= mapped_column(ARRAY(REAL))"
+        )
+
+    content = _NULLTYPE_COLUMN_RE.sub(_replace_nulltype, content)
 
     out_path.write_text(content)
 

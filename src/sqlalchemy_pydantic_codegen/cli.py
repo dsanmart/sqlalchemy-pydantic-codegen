@@ -5,8 +5,7 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 
-# from sqlalchemy_pydantic_codegen.core.cleaner import clean_models
-from sqlalchemy_pydantic_codegen.core.cleaner import clean_schemas
+from sqlalchemy_pydantic_codegen.core.cleaner import clean_models, clean_schemas
 from sqlalchemy_pydantic_codegen.core.generator import ModelGenerator, load_models
 
 
@@ -54,13 +53,33 @@ def main():
         type=str,
         help="Path to a Python configuration file for custom model mappings.",
     )
-    # parser.add_argument(
-    #     "--clean-models", action="store_true", help="Clean up generated models."
-    # )
+    parser.add_argument(
+        "--raw-models",
+        type=str,
+        help=(
+            "Optional path to a raw sqlacodegen output file. When provided, "
+            "the file is cleaned (Base/timestamp drops, NullType column "
+            "rewrites) and written to the file backing --models-path before "
+            "schema generation."
+        ),
+    )
 
     args = parser.parse_args()
 
     logging.basicConfig(level=logging.INFO)
+
+    if args.raw_models:
+        spec = importlib.util.find_spec(args.models_path)
+        if not spec or not spec.origin:
+            raise RuntimeError(
+                f"Cannot resolve a file path for module '{args.models_path}'; "
+                "--raw-models requires --models-path to point at an importable "
+                "module backed by a .py file."
+            )
+        target = Path(spec.origin)
+        logging.info(f"Cleaning {args.raw_models} -> {target}...")
+        clean_models(Path(args.raw_models), target)
+
     logging.info("Generating schemas...")
 
     # Assume templates are in a standard location within the package
@@ -79,10 +98,6 @@ def main():
         clean_schemas(output_dir, custom_jsonb_models, custom_imports)
     else:
         clean_schemas(output_dir)
-
-    # if args.clean_models:
-    #     logging.info("Cleaning models...")
-    #     clean_models(args.output_dir)
 
     logging.info("Schema generation complete.")
 

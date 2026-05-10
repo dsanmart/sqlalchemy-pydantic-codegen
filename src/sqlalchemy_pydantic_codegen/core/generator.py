@@ -7,6 +7,7 @@ from typing import Any
 
 from jinja2 import Environment, FileSystemLoader
 from sqlalchemy.orm import ColumnProperty, Mapper
+from sqlalchemy.orm.exc import MappedAnnotationError
 
 from ..utils.type_mapping import (
     get_default_value,
@@ -171,5 +172,20 @@ class ModelGenerator:
 
 
 def load_models(module_path: str) -> list[Mapper[Any]]:
-    module = import_module(module_path)
+    try:
+        module = import_module(module_path)
+    except MappedAnnotationError as e:
+        raise RuntimeError(
+            f"Failed to import '{module_path}': {e}\n\n"
+            "This usually means a column has an unrecognized DB type "
+            "(commonly pgvector's `vector`, `tsvector`, `geometry`, or a "
+            "custom domain), which sqlacodegen emits as "
+            "`Mapped[Any] = mapped_column(NullType)`. SQLAlchemy rejects "
+            "the `Mapped[Any]` annotation at import time.\n\n"
+            "To fix: run the model file through "
+            "`sqlalchemy_pydantic_codegen.core.cleaner.clean_models` "
+            "(which rewrites NullType columns to an importable form), or "
+            "replace the column type with an explicit SQLAlchemy type — "
+            "e.g. `pgvector.sqlalchemy.Vector(dim)` for pgvector columns."
+        ) from e
     return list(module.Base.registry.mappers)
