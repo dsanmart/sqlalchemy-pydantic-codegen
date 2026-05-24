@@ -10,9 +10,10 @@ from sqlalchemy.orm import ColumnProperty, Mapper
 from sqlalchemy.sql import sqltypes
 
 from ..utils.type_mapping import (
-    get_default_value,
+    can_materialize_literal,
     is_nullable,
     map_sqlalchemy_type_to_pydantic,
+    resolve_column_default,
 )
 
 
@@ -102,11 +103,6 @@ class ModelGenerator:
             if isinstance(prop, ColumnProperty) and prop.columns:
                 col = prop.columns[0]
                 py_type, field_args_dict = map_sqlalchemy_type_to_pydantic(col.type)
-                nullable = is_nullable(col)
-                default = get_default_value(col)
-
-                type_hint = py_type if not nullable else f"{py_type} | None"
-                default_value = "..." if not nullable and not default else "None"
 
                 if prop.key == "id":
                     id_type = py_type
@@ -121,10 +117,30 @@ class ModelGenerator:
                     continue
 
                 nullable = is_nullable(col)
-                default = get_default_value(col)
+                default_kind, default_literal = resolve_column_default(col)
 
-                type_hint = py_type if not nullable else f"{py_type} | None"
-                default_value = "..." if not nullable and not default else "None"
+                if nullable:
+                    # Nullable column: optional, no materialized default.
+                    type_hint = f"{py_type} | None"
+                    default_value = "None"
+                elif default_kind == "literal" and can_materialize_literal(
+                    default_literal, py_type
+                ):
+                    # NOT NULL with a scalar default whose Python type matches
+                    # the field: materialize it; the type stays narrow.
+                    type_hint = py_type
+                    default_value = repr(default_literal)
+                elif default_kind != "none":
+                    # Non-literal default (function/expression) OR a literal
+                    # whose type doesn't match the field (e.g. JSONB '{}'
+                    # parsed to str "{}" on a dict field). The DB will supply
+                    # the value, so make the field optional on insert.
+                    type_hint = f"{py_type} | None"
+                    default_value = "None"
+                else:
+                    # NOT NULL with no default: required.
+                    type_hint = py_type
+                    default_value = "..."
 
                 field_args = [
                     f"{k}={v!r}" for k, v in field_args_dict.items() if v is not None

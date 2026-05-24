@@ -91,6 +91,43 @@ def test_generate_models(generator: ModelGenerator, sample_models_module):
     rmtree(output_dir)
 
 
+def test_server_default_columns(generator: ModelGenerator):
+    """NOT NULL columns with a DB/ORM default must not be emitted as required.
+
+    Scalar defaults (server_default=text("10"), text("true"), text("'x'") or
+    default=3) are materialized as the Field default with the type kept narrow.
+    Function defaults (server_default=text("now()")) make the field optional.
+    Plain NOT NULL columns stay required; nullable columns are unchanged.
+    """
+    mappers = load_models("tests.fixtures.server_default_models")
+    generator.generate_models(mappers)
+
+    content = (generator.output_dir / "ai_personality.py").read_text()
+    # ruff format (run by format_file) normalizes repr()'s single quotes.
+    normalized = content.replace("'", '"')
+
+    # Scalar default -> materialized literal, type NOT widened.
+    assert "autopilot_pause_minutes: int = Field(default=10)" in content
+    assert "is_active: bool = Field(default=True)" in content
+    assert 'tone: str = Field(default="concise")' in normalized
+    # ORM-side scalar default.
+    assert "retry_count: int = Field(default=3)" in content
+    # Function default -> optional.
+    assert "created_at: datetime.datetime | None = Field(default=None)" in content
+    # Plain NOT NULL -> still required.
+    assert "display_name: str = Field(default=...)" in content
+    # Nullable -> unchanged.
+    assert "notes: str | None = Field(default=None)" in content
+    # JSONB/ARRAY '{}'-style defaults must NOT materialize as a string default
+    # on a dict/list field — that produces a schema that fails validation.
+    assert "data: list[dict[str, Any]] | dict[str, Any] | None" in content
+    assert "data:" in content and "Field(default=None)" in content.split("data:")[1].split("\n")[0]
+    assert "tags: list[Any] | None" in content
+    assert "tags:" in content and "Field(default=None)" in content.split("tags:")[1].split("\n")[0]
+
+    rmtree(generator.output_dir)
+
+
 def test_load_models_accepts_mapped_any_nulltype(tmp_path: Path):
     """sqlacodegen emits `Mapped[Any] = mapped_column(NullType)` for unknown
     DB types (pgvector's vector, tsvector, geometry, custom domains).

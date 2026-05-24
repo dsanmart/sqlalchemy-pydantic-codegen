@@ -1,7 +1,8 @@
 # File: /sqlalchemy-pydantic-codegen/sqlalchemy-pydantic-codegen/src/sqlalchemy_pydantic_codegen/utils/type_mapping.py
 
+import re
 import uuid
-from typing import Any, cast
+from typing import Any, Literal, cast
 
 from sqlalchemy import (
     ARRAY,
@@ -84,5 +85,87 @@ def is_nullable(sqlalchemy_type: NamedColumn[Any]) -> bool:
     return sqlalchemy_type.nullable if hasattr(sqlalchemy_type, "nullable") else False
 
 
-def get_default_value(sqlalchemy_type: NamedColumn[Any]) -> Any:
-    return sqlalchemy_type.default if hasattr(sqlalchemy_type, "default") else None
+DefaultKind = Literal["none", "literal", "non_literal"]
+
+
+def _server_default_sql(server_default: Any) -> str | None:
+    """Return the raw SQL text of a column's ``server_default``, or ``None``.
+
+    ``server_default`` is normally a ``DefaultClause`` whose ``.arg`` is a
+    ``TextClause`` (from ``text(...)``) or a plain string. A bare
+    ``FetchedValue`` has no ``.arg`` and yields ``None``.
+    """
+    arg = getattr(server_default, "arg", None)
+    if arg is None:
+        return None
+    text_attr = getattr(arg, "text", None)
+    if isinstance(text_attr, str):
+        return text_attr
+    if isinstance(arg, str):
+        return arg
+    return None
+
+
+def _parse_sql_literal(sql: str) -> tuple[DefaultKind, Any]:
+    """Classify a server-default SQL fragment as a scalar literal or not."""
+    s = sql.strip()
+    # Strip a trailing Postgres cast: "'concise'::text" -> "'concise'".
+    s = re.sub(r"::[\w ]+$", "", s).strip()
+    lowered = s.lower()
+    if re.fullmatch(r"-?\d+", s):
+        return ("literal", int(s))
+    if re.fullmatch(r"-?\d+\.\d+", s):
+        return ("literal", float(s))
+    if lowered in ("true", "false"):
+        return ("literal", lowered == "true")
+    # Single-quoted string with no call expression -> str literal. Checked
+    # before the non-literal fallthrough so e.g. 'current_user' stays a str.
+    m = re.fullmatch(r"'(.*)'", s, re.DOTALL)
+    if m and "(" not in s:
+        return ("literal", m.group(1).replace("''", "'"))
+    # now(), nextval(...), gen_random_uuid(), current_timestamp, etc.
+    return ("non_literal", None)
+
+
+_LITERAL_PY_TYPE_NAMES: dict[type, frozenset[str]] = {
+    int: frozenset({"int"}),
+    float: frozenset({"float"}),
+    bool: frozenset({"bool"}),
+    str: frozenset({"str"}),
+}
+
+
+def can_materialize_literal(value: Any, py_type: str) -> bool:
+    """Whether a parsed scalar literal is safe to emit as the field default.
+
+    Guards against cases like JSONB ``'{}'::jsonb`` — ``_parse_sql_literal``
+    correctly extracts the string ``"{}"``, but emitting that as the default
+    for a ``dict[str, Any]`` field produces a Pydantic schema that fails
+    validation whenever the field is omitted.
+    """
+    return py_type in _LITERAL_PY_TYPE_NAMES.get(type(value), frozenset())
+
+
+def resolve_column_default(col: NamedColumn[Any]) -> tuple[DefaultKind, Any]:
+    """Resolve a column's insert-time default.
+
+    Returns ``(kind, value)``:
+      * ``("none", None)``        -- no default; the column must be supplied
+      * ``("literal", value)``    -- a scalar literal the DB/ORM supplies
+      * ``("non_literal", None)`` -- a function/expression/callable default
+
+    Reads ``server_default`` (DB-side) first, then ``default`` (ORM-side).
+    """
+    server_default = getattr(col, "server_default", None)
+    if server_default is not None:
+        sql = _server_default_sql(server_default)
+        return _parse_sql_literal(sql) if sql is not None else ("non_literal", None)
+
+    default = getattr(col, "default", None)
+    if default is not None:
+        if getattr(default, "is_scalar", False):
+            return ("literal", default.arg)
+        # Callables, sequences and SQL expressions are not materializable.
+        return ("non_literal", None)
+
+    return ("none", None)
