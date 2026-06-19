@@ -14,6 +14,7 @@ from sqlalchemy import (
     Integer,
     Numeric,
     String,
+    Time,
 )
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
@@ -52,6 +53,8 @@ def map_sqlalchemy_type_to_pydantic(
         return "datetime.datetime", {}
     elif isinstance(sqlalchemy_type, Date):
         return "datetime.date", {}
+    elif isinstance(sqlalchemy_type, Time):
+        return "datetime.time", {}
     elif isinstance(sqlalchemy_type, JSONB):
         return "list[dict[str, Any]] | dict[str, Any]", {}
     elif isinstance(sqlalchemy_type, ARRAY):
