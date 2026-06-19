@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "sqlalchemy-pydantic-codegen"
-version = "1.1.0"
+version = "1.1.1"
 description = "A library to generate Pydantic models from SQLAlchemy models."
 license = { text = "MIT" }
 readme = "README.md"
