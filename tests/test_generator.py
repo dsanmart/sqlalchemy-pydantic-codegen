@@ -62,6 +62,7 @@ def test_generate_models(generator: ModelGenerator, sample_models_module):
     assert "id: UUID | None = Field(default=None)" in user_content
     assert "name: str | None = Field(default=None)" in user_content
     assert "email: str | None = Field(default=None)" in user_content
+    assert "working_hours_start: datetime.time | None = Field(default=None)" in user_content
 
     post_content = (output_dir / "post.py").read_text()
     print(post_content)
